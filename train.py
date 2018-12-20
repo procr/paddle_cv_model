@@ -20,6 +20,7 @@ from utils.learning_rate import cosine_decay
 from utility import add_arguments, print_arguments
 import models
 import models_name
+import paddle.fluid.profiler as profiler
 
 parser = argparse.ArgumentParser(description=__doc__)
 add_arg = functools.partial(add_arguments, argparser=parser)
@@ -119,7 +120,7 @@ def optimizer_setting(params):
 
     return optimizer
 
-def net_config(image, label, model, args):
+def net_config(main_prog, image, label, model, args):
     model_list = [m for m in dir(models) if "__" not in m]
     assert args.model in model_list,"{} is not lists: {}".format(
         args.model, model_list)
@@ -134,6 +135,9 @@ def net_config(image, label, model, args):
 
     if model_name == "GoogleNet":
         out0, out1, out2 = model.net(input=image, class_dim=class_dim)
+
+        infer_prog = main_prog.clone(for_test=True)
+
         cost0 = fluid.layers.cross_entropy(input=out0, label=label)
         cost1 = fluid.layers.cross_entropy(input=out1, label=label)
         cost2 = fluid.layers.cross_entropy(input=out2, label=label)
@@ -144,15 +148,20 @@ def net_config(image, label, model, args):
         avg_cost = avg_cost0 + 0.3 * avg_cost1 + 0.3 * avg_cost2
         acc_top1 = fluid.layers.accuracy(input=out0, label=label, k=1)
         acc_top5 = fluid.layers.accuracy(input=out0, label=label, k=5)
+
+        return infer_prog, out0, avg_cost, acc_top1, acc_top5
     else:
         out = model.net(input=image, class_dim=class_dim)
+
+        infer_prog = main_prog.clone(for_test=True)
+
         cost = fluid.layers.cross_entropy(input=out, label=label)
 
         avg_cost = fluid.layers.mean(x=cost)
         acc_top1 = fluid.layers.accuracy(input=out, label=label, k=1)
-        acc_top5 = fluid.layers.accuracy(input=out, label=label, k=5)
+        acc_top5 = fluid.layers.accuracy(input=out, label=label, k=5) 
 
-    return avg_cost, acc_top1, acc_top5
+        return infer_prog, out, avg_cost, acc_top1, acc_top5
 
 
 def build_program(is_train, main_prog, startup_prog, args):
@@ -163,15 +172,22 @@ def build_program(is_train, main_prog, startup_prog, args):
                                                                      model_list)
     model = models.__dict__[model_name]()
     with fluid.program_guard(main_prog, startup_prog):
+        """
         py_reader = fluid.layers.py_reader(
             capacity=16,
             shapes=[[-1] + image_shape, [-1, 1]],
             lod_levels=[0, 0],
             dtypes=["float32", "int64"],
             use_double_buffer=True)
+        """
         with fluid.unique_name.guard():
-            image, label = fluid.layers.read_file(py_reader)
-            avg_cost, acc_top1, acc_top5 = net_config(image, label, model, args)
+            #image, label = fluid.layers.read_file(py_reader)
+            #avg_cost, acc_top1, acc_top5 = net_config(image, label, model, args)
+
+            data_layer = fluid.layers.data(name='data', shape=[3, 224, 224], dtype='float32')
+            label_layer = fluid.layers.data(name='label', shape=[1], dtype='int64')
+            infer_prog, out, avg_cost, acc_top1, acc_top5 = net_config(main_prog, data_layer, label_layer, model, args)
+
             avg_cost.persistable = True
             acc_top1.persistable = True
             acc_top5.persistable = True
@@ -185,8 +201,10 @@ def build_program(is_train, main_prog, startup_prog, args):
 
                 optimizer = optimizer_setting(params)
                 optimizer.minimize(avg_cost)
+                return infer_prog, out, avg_cost, acc_top1, acc_top5
 
-    return py_reader, avg_cost, acc_top1, acc_top5
+    #return py_reader, avg_cost, acc_top1, acc_top5
+    return avg_cost, acc_top1, acc_top5
 
 
 def train(args):
@@ -205,12 +223,14 @@ def train(args):
         startup_prog.random_seed = 1000
         train_prog.random_seed = 1000
 
-    train_py_reader, train_cost, train_acc1, train_acc5 = build_program(
+    #train_py_reader, train_cost, train_acc1, train_acc5 = build_program(
+    infer_prog, train_out, train_cost, train_acc1, train_acc5 = build_program(
         is_train=True,
         main_prog=train_prog,
         startup_prog=startup_prog,
         args=args)
-    test_py_reader, test_cost, test_acc1, test_acc5 = build_program(
+    #test_py_reader, test_cost, test_acc1, test_acc5 = build_program(
+    test_cost, test_acc1, test_acc5 = build_program(
         is_train=False,
         main_prog=test_prog,
         startup_prog=startup_prog,
@@ -224,6 +244,7 @@ def train(args):
     place = fluid.CUDAPlace(0) if args.use_gpu else fluid.CPUPlace()
     exe = fluid.Executor(place)
     exe.run(startup_prog)
+    print("done")
 
     if checkpoint is not None:
         fluid.io.load_persistables(exe, checkpoint, main_program=train_prog)
@@ -261,12 +282,14 @@ def train(args):
         test_reader = paddle.batch(
             flowers.test(use_xmap=False), batch_size=test_batch_size)
 
-    train_py_reader.decorate_paddle_reader(train_reader)
-    test_py_reader.decorate_paddle_reader(test_reader)
+    #train_py_reader.decorate_paddle_reader(train_reader)
+    #test_py_reader.decorate_paddle_reader(test_reader)
+    """
     train_exe = fluid.ParallelExecutor(
         main_program=train_prog,
         use_cuda=bool(args.use_gpu),
         loss_name=train_cost.name)
+    """
 
     train_fetch_list = [train_cost.name, train_acc1.name, train_acc5.name]
     test_fetch_list = [test_cost.name, test_acc1.name, test_acc5.name]
@@ -275,7 +298,7 @@ def train(args):
 
     for pass_id in range(params["num_epochs"]):
 
-        train_py_reader.start()
+        #train_py_reader.start()
 
         train_info = [[], [], []]
         test_info = [[], [], []]
@@ -283,8 +306,35 @@ def train(args):
         batch_id = 0
         try:
             while True:
+                #loss, acc1, acc5 = train_exe.run(fetch_list=train_fetch_list)
+
+                img_data = np.random.random([1, 3, 224, 224]).astype('float32')
+                y_data = np.random.random([1, 1]).astype('int64')
+
                 t1 = time.time()
-                loss, acc1, acc5 = train_exe.run(fetch_list=train_fetch_list)
+
+                if batch_id == 10:
+                    profiler.start_profiler("All")
+                loss, acc1, acc5 = exe.run(train_prog,
+                        feed={"data": img_data, "label": y_data},
+                        fetch_list=train_fetch_list)
+                if batch_id == 10:
+                    profiler.stop_profiler("total", "/tmp/profile")
+
+                    model_path = os.path.join(model_save_dir + '/' + model_name)
+                    if not os.path.isdir(model_path):
+                        os.makedirs(model_path)
+                        fluid.io.save_inference_model(model_path, 
+                                ["data"], 
+                                [train_out], 
+                                exe, 
+                                main_program=infer_prog,
+                                model_filename="__model__",
+                                params_filename="__params__")
+                        print("save models to %s" % (model_path))
+                    break
+
+
                 t2 = time.time()
                 period = t2 - t1
                 loss = np.mean(np.array(loss))
@@ -302,21 +352,40 @@ def train(args):
                     sys.stdout.flush()
                 batch_id += 1
         except fluid.core.EOFException:
-            train_py_reader.reset()
+            exit()
+            #train_py_reader.reset()
 
         train_loss = np.array(train_info[0]).mean()
         train_acc1 = np.array(train_info[1]).mean()
         train_acc5 = np.array(train_info[2]).mean()
         train_speed = np.array(train_time).mean() / train_batch_size
 
-        test_py_reader.start()
+        #test_py_reader.start()
 
         test_batch_id = 0
         try:
             while True:
                 t1 = time.time()
+                """
                 loss, acc1, acc5 = exe.run(program=test_prog,
                                            fetch_list=test_fetch_list)
+                """
+
+
+                img_data = np.random.random([1, 3, 224, 224]).astype('float32')
+                y_data = np.random.random([1, 1]).astype('int64')
+
+                t1 = time.time()
+
+                if test_batch_id == 10:
+                    profiler.start_profiler("All")
+                loss, acc1, acc5 = exe.run(test_prog,
+                        feed={"data": img_data, "label": y_data},
+                        fetch_list=test_fetch_list)
+                if test_batch_id == 10:
+                    profiler.stop_profiler("total", "/tmp/profile")
+                    break
+
                 t2 = time.time()
                 period = t2 - t1
                 loss = np.mean(loss)
@@ -333,7 +402,8 @@ def train(args):
                     sys.stdout.flush()
                 test_batch_id += 1
         except fluid.core.EOFException:
-            test_py_reader.reset()
+            exit()
+            #test_py_reader.reset()
 
         test_loss = np.array(test_info[0]).mean()
         test_acc1 = np.array(test_info[1]).mean()
@@ -345,11 +415,19 @@ def train(args):
                   test_acc1, test_acc5))
         sys.stdout.flush()
 
+
+        """
         model_path = os.path.join(model_save_dir + '/' + model_name,
                                   str(pass_id))
         if not os.path.isdir(model_path):
             os.makedirs(model_path)
-        fluid.io.save_persistables(exe, model_path, main_program=train_prog)
+            print(train_cost)
+            fluid.io.save_inference_model(model_path, ["data", "label"], [train_cost, train_acc1], exe, main_program=train_prog)
+          u print("save models to %s" % (model_path))
+        """
+        exit()
+
+        #fluid.io.save_persistables(exe, model_path, main_program=train_prog)
 
         # This is for continuous evaluation only
         if args.enable_ce and pass_id == args.num_epochs - 1:
