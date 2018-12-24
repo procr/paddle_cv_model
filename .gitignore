@@ -1,5 +1,6 @@
 # saved model
 output/
+*.pyc
 
 # coco and pascalvoc data
 data/ILSVRC2012/ILSVRC2012_img_val.tar
