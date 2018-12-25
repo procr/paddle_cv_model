@@ -32,11 +32,12 @@ add_arg('num_epochs',       int,   120,                  "number of epochs.")
 add_arg('class_dim',        int,   1000,                 "Class number.")
 add_arg('image_shape',      str,   "3,224,224",          "input image size")
 add_arg('model_save_dir',   str,   "output",             "model save directory")
-add_arg('with_mem_opt',     bool,  True,                 "Whether to use memory optimization or not.")
+add_arg('with_mem_opt',     bool,  False,                 "Whether to use memory optimization or not.")
 add_arg('pretrained_model', str,   None,                 "Whether to use pretrained model.")
 add_arg('checkpoint',       str,   None,                 "Whether to resume checkpoint.")
 add_arg('lr',               float, 0.1,                  "set learning rate.")
-add_arg('lr_strategy',      str,   "piecewise_decay",    "Set the learning rate decay strategy.")
+#add_arg('lr_strategy',      str,   "piecewise_decay",    "Set the learning rate decay strategy.")
+add_arg('lr_strategy',      str,   "",    "Set the learning rate decay strategy.")
 add_arg('model',            str,   "SE_ResNeXt50_32x4d", "Set the network to use.")
 add_arg('enable_ce',        bool,  False,                "If set True, enable continuous evaluation job.")
 add_arg('data_dir',         str,   "./data/ILSVRC2012",  "The ImageNet dataset root dir.")
@@ -113,10 +114,15 @@ def optimizer_setting(params):
 
     else:
         lr = params["lr"]
+        """
         optimizer = fluid.optimizer.Momentum(
             learning_rate=lr,
             momentum=0.9,
             regularization=fluid.regularizer.L2Decay(1e-4))
+        """
+        optimizer = fluid.optimizer.Momentum(
+            learning_rate=lr,
+            momentum=0.9)
 
     return optimizer
 
@@ -241,7 +247,23 @@ def train(args):
         fluid.memory_optimize(train_prog)
         fluid.memory_optimize(test_prog)
 
-    place = fluid.CUDAPlace(0) if args.use_gpu else fluid.CPUPlace()
+    """
+    print("-------------------------------------")
+    for block in train_prog.blocks:
+        for op in block.ops:
+            print("op_train: ", op.type)
+    print("-------------------------------------")
+    for block in test_prog.blocks:
+        for op in block.ops:
+            print("op_infer: ", op.type)
+    exit()
+    """
+
+    #place = fluid.CUDAPlace(0) if args.use_gpu else fluid.CPUPlace()
+    #place = fluid.XSIMPlace()
+    place = fluid.XCPUPlace()
+    #place = fluid.CUDAPlace(1)
+
     exe = fluid.Executor(place)
     exe.run(startup_prog)
     print("done")
@@ -313,11 +335,14 @@ def train(args):
 
                 t1 = time.time()
 
+                """
                 if batch_id == 10:
                     profiler.start_profiler("All")
+                """
                 loss, acc1, acc5 = exe.run(train_prog,
                         feed={"data": img_data, "label": y_data},
                         fetch_list=train_fetch_list)
+                """
                 if batch_id == 10:
                     profiler.stop_profiler("total", "/tmp/profile")
 
@@ -333,6 +358,8 @@ def train(args):
                                 params_filename="__params__")
                         print("save models to %s" % (model_path))
                     break
+                """
+                break
 
 
                 t2 = time.time()
@@ -377,14 +404,18 @@ def train(args):
 
                 t1 = time.time()
 
+                """
                 if test_batch_id == 10:
                     profiler.start_profiler("All")
+                """
                 loss, acc1, acc5 = exe.run(test_prog,
                         feed={"data": img_data, "label": y_data},
                         fetch_list=test_fetch_list)
+                """
                 if test_batch_id == 10:
                     profiler.stop_profiler("total", "/tmp/profile")
-                    break
+                """
+                break
 
                 t2 = time.time()
                 period = t2 - t1

@@ -5,5 +5,5 @@ models=("ResNet50" "VGG19" "AlexNet" "GoogleNet" "InceptionV4" "MobileNet" "Mobi
 for model in  ${models[@]}
 do
     echo $mdoel
-    python train.py --model=$model
+    python train.py --model=$model 2>&1 | tee perf_$model.log
 done
