@@ -42,6 +42,7 @@ add_arg('model',            str,   "SE_ResNeXt50_32x4d", "Set the network to use
 add_arg('enable_ce',        bool,  False,                "If set True, enable continuous evaluation job.")
 add_arg('data_dir',         str,   "./data/ILSVRC2012",  "The ImageNet dataset root dir.")
 add_arg('model_category',   str,   "models",             "Whether to use models_name or not, valid value:'models','models_name'" )
+add_arg('run_mode',         str,   "train",              "train, infer, fused_infer.")
 # yapf: enabl
 
 
@@ -260,8 +261,8 @@ def train(args):
     """
 
     #place = fluid.CUDAPlace(0) if args.use_gpu else fluid.CPUPlace()
-    #place = fluid.XSIMPlace()
-    place = fluid.XCPUPlace()
+    place = fluid.XSIMPlace()
+    #place = fluid.XCPUPlace()
     #place = fluid.CUDAPlace(1)
 
     exe = fluid.Executor(place)
@@ -279,11 +280,14 @@ def train(args):
         fluid.io.load_vars(
             exe, pretrained_model, main_program=train_prog, predicate=if_exist)
 
+    """
     visible_device = os.getenv('CUDA_VISIBLE_DEVICES')
     if visible_device:
         device_num = len(visible_device.split(','))
     else:
         device_num = subprocess.check_output(['nvidia-smi', '-L']).count('\n')
+    """
+    device_num = 1
 
     train_batch_size = args.batch_size / device_num
     test_batch_size = 8
@@ -326,6 +330,35 @@ def train(args):
         test_info = [[], [], []]
         train_time = []
         batch_id = 0
+
+        if (args.run_mode == "train"):
+            prog = train_prog
+        elif (args.run_mode == "infer"):
+            prog = test_prog
+        elif (args.run_mode == "fused_infer"):
+            inference_transpiler_program = test_prog.clone()
+            t = fluid.transpiler.InferenceTranspiler()
+            t.transpile_xpu(inference_transpiler_program, place)
+            prog = inference_transpiler_program
+        else:
+            print("bad run_mode: ", args.run_mode)
+            exit()
+
+
+        img_data = np.random.random([1, 3, 224, 224]).astype('float32')
+        y_data = np.random.random([1, 1]).astype('int64')
+
+        t1 = time.time()
+
+        """
+        if batch_id == 10:
+            profiler.start_profiler("All")
+        """
+        loss, acc1, acc5 = exe.run(prog,
+                feed={"data": img_data, "label": y_data},
+                fetch_list=train_fetch_list)
+        exit()
+
         try:
             while True:
                 #loss, acc1, acc5 = train_exe.run(fetch_list=train_fetch_list)
@@ -339,7 +372,7 @@ def train(args):
                 if batch_id == 10:
                     profiler.start_profiler("All")
                 """
-                loss, acc1, acc5 = exe.run(train_prog,
+                loss, acc1, acc5 = exe.run(prog,
                         feed={"data": img_data, "label": y_data},
                         fetch_list=train_fetch_list)
                 """
@@ -381,11 +414,12 @@ def train(args):
         except fluid.core.EOFException:
             exit()
             #train_py_reader.reset()
+        exit()
 
-        train_loss = np.array(train_info[0]).mean()
-        train_acc1 = np.array(train_info[1]).mean()
-        train_acc5 = np.array(train_info[2]).mean()
-        train_speed = np.array(train_time).mean() / train_batch_size
+        #train_loss = np.array(train_info[0]).mean()
+        #train_acc1 = np.array(train_info[1]).mean()
+        #train_acc5 = np.array(train_info[2]).mean()
+        #train_speed = np.array(train_time).mean() / train_batch_size
 
         #test_py_reader.start()
 
@@ -408,7 +442,7 @@ def train(args):
                 if test_batch_id == 10:
                     profiler.start_profiler("All")
                 """
-                loss, acc1, acc5 = exe.run(test_prog,
+                loss, acc1, acc5 = exe.run(prog,
                         feed={"data": img_data, "label": y_data},
                         fetch_list=test_fetch_list)
                 """
