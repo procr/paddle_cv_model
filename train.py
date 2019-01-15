@@ -25,7 +25,7 @@ import paddle.fluid.profiler as profiler
 parser = argparse.ArgumentParser(description=__doc__)
 add_arg = functools.partial(add_arguments, argparser=parser)
 # yapf: disable
-add_arg('batch_size',       int,   256,                  "Minibatch size.")
+add_arg('batch_size',       int,   1,                  "Minibatch size.")
 add_arg('use_gpu',          bool,  True,                 "Whether to use GPU or not.")
 add_arg('total_images',     int,   1281167,              "Training image number.")
 add_arg('num_epochs',       int,   120,                  "number of epochs.")
@@ -43,6 +43,7 @@ add_arg('enable_ce',        bool,  False,                "If set True, enable co
 add_arg('data_dir',         str,   "./data/ILSVRC2012",  "The ImageNet dataset root dir.")
 add_arg('model_category',   str,   "models",             "Whether to use models_name or not, valid value:'models','models_name'" )
 add_arg('run_mode',         str,   "train",              "train, infer, fused_infer.")
+add_arg('place',            str,   "cuda",               "cuda, xsim.")
 # yapf: enabl
 
 
@@ -261,263 +262,53 @@ def train(args):
     """
 
     #place = fluid.CUDAPlace(0) if args.use_gpu else fluid.CPUPlace()
-    place = fluid.XSIMPlace()
+    #place = fluid.XSIMPlace()
     #place = fluid.XCPUPlace()
-    #place = fluid.CUDAPlace(1)
+    if args.place == "cuda":
+        place = fluid.CUDAPlace(0)
+    elif args.place == "xsim":
+        place = fluid.XSIMPlace()
+    else:
+        print("Unsurpported place!")
+        exit()
+
 
     exe = fluid.Executor(place)
     exe.run(startup_prog)
-    print("done")
-
-    if checkpoint is not None:
-        fluid.io.load_persistables(exe, checkpoint, main_program=train_prog)
-
-    if pretrained_model:
-
-        def if_exist(var):
-            return os.path.exists(os.path.join(pretrained_model, var.name))
-
-        fluid.io.load_vars(
-            exe, pretrained_model, main_program=train_prog, predicate=if_exist)
-
-    """
-    visible_device = os.getenv('CUDA_VISIBLE_DEVICES')
-    if visible_device:
-        device_num = len(visible_device.split(','))
-    else:
-        device_num = subprocess.check_output(['nvidia-smi', '-L']).count('\n')
-    """
-    device_num = 1
-
-    train_batch_size = args.batch_size / device_num
-    test_batch_size = 8
-    if not args.enable_ce:
-        train_reader = paddle.batch(
-            reader.train(), batch_size=train_batch_size, drop_last=True)
-        test_reader = paddle.batch(reader.val(), batch_size=test_batch_size)
-    else:
-        # use flowers dataset for CE and set use_xmap False to avoid disorder data
-        # but it is time consuming. For faster speed, need another dataset.
-        import random
-        random.seed(0)
-        np.random.seed(0)
-        train_reader = paddle.batch(
-            flowers.train(use_xmap=False),
-            batch_size=train_batch_size,
-            drop_last=True)
-        test_reader = paddle.batch(
-            flowers.test(use_xmap=False), batch_size=test_batch_size)
-
-    #train_py_reader.decorate_paddle_reader(train_reader)
-    #test_py_reader.decorate_paddle_reader(test_reader)
-    """
-    train_exe = fluid.ParallelExecutor(
-        main_program=train_prog,
-        use_cuda=bool(args.use_gpu),
-        loss_name=train_cost.name)
-    """
 
     train_fetch_list = [train_cost.name, train_acc1.name, train_acc5.name]
-    test_fetch_list = [test_cost.name, test_acc1.name, test_acc5.name]
 
-    params = models.__dict__[args.model]().params
-
-    for pass_id in range(params["num_epochs"]):
-
-        #train_py_reader.start()
-
-        train_info = [[], [], []]
-        test_info = [[], [], []]
-        train_time = []
-        batch_id = 0
-
-        if (args.run_mode == "train"):
-            prog = train_prog
-        elif (args.run_mode == "infer"):
-            prog = test_prog
-        elif (args.run_mode == "fused_infer"):
-            inference_transpiler_program = test_prog.clone()
-            t = fluid.transpiler.InferenceTranspiler()
-            t.transpile_xpu(inference_transpiler_program, place)
-            prog = inference_transpiler_program
-        else:
-            print("bad run_mode: ", args.run_mode)
-            exit()
+    if (args.run_mode == "train"):
+        prog = train_prog
+    elif (args.run_mode == "infer"):
+        prog = test_prog
+    elif (args.run_mode == "fused_infer"):
+        inference_transpiler_program = test_prog.clone()
+        t = fluid.transpiler.InferenceTranspiler()
+        t.transpile_xpu(inference_transpiler_program, place)
+        prog = inference_transpiler_program
+    else:
+        print("bad run_mode: ", args.run_mode)
+        exit()
 
 
-        img_data = np.random.random([1, 3, 224, 224]).astype('float32')
-        y_data = np.random.random([1, 1]).astype('int64')
+    img_data = np.random.random([args.batch_size, 3, 224, 224]).astype('float32')
+    y_data = np.random.random([args.batch_size, 1]).astype('int64')
 
-        t1 = time.time()
-
-        """
-        if batch_id == 10:
-            profiler.start_profiler("All")
-        """
+    if args.place == "cuda":
+        # warm up
         loss, acc1, acc5 = exe.run(prog,
                 feed={"data": img_data, "label": y_data},
                 fetch_list=train_fetch_list)
-        exit()
+        
+        profiler.start_profiler("All")
 
-        try:
-            while True:
-                #loss, acc1, acc5 = train_exe.run(fetch_list=train_fetch_list)
+    loss, acc1, acc5 = exe.run(prog,
+            feed={"data": img_data, "label": y_data},
+            fetch_list=train_fetch_list)
 
-                img_data = np.random.random([1, 3, 224, 224]).astype('float32')
-                y_data = np.random.random([1, 1]).astype('int64')
-
-                t1 = time.time()
-
-                """
-                if batch_id == 10:
-                    profiler.start_profiler("All")
-                """
-                loss, acc1, acc5 = exe.run(prog,
-                        feed={"data": img_data, "label": y_data},
-                        fetch_list=train_fetch_list)
-                """
-                if batch_id == 10:
-                    profiler.stop_profiler("total", "/tmp/profile")
-
-                    model_path = os.path.join(model_save_dir + '/' + model_name)
-                    if not os.path.isdir(model_path):
-                        os.makedirs(model_path)
-                        fluid.io.save_inference_model(model_path, 
-                                ["data"], 
-                                [train_out], 
-                                exe, 
-                                main_program=infer_prog,
-                                model_filename="__model__",
-                                params_filename="__params__")
-                        print("save models to %s" % (model_path))
-                    break
-                """
-                break
-
-
-                t2 = time.time()
-                period = t2 - t1
-                loss = np.mean(np.array(loss))
-                acc1 = np.mean(np.array(acc1))
-                acc5 = np.mean(np.array(acc5))
-                train_info[0].append(loss)
-                train_info[1].append(acc1)
-                train_info[2].append(acc5)
-                train_time.append(period)
-                if batch_id % 10 == 0:
-                    print("Pass {0}, trainbatch {1}, loss {2}, \
-                        acc1 {3}, acc5 {4} time {5}"
-                          .format(pass_id, batch_id, loss, acc1, acc5,
-                                  "%2.2f sec" % period))
-                    sys.stdout.flush()
-                batch_id += 1
-        except fluid.core.EOFException:
-            exit()
-            #train_py_reader.reset()
-        exit()
-
-        #train_loss = np.array(train_info[0]).mean()
-        #train_acc1 = np.array(train_info[1]).mean()
-        #train_acc5 = np.array(train_info[2]).mean()
-        #train_speed = np.array(train_time).mean() / train_batch_size
-
-        #test_py_reader.start()
-
-        test_batch_id = 0
-        try:
-            while True:
-                t1 = time.time()
-                """
-                loss, acc1, acc5 = exe.run(program=test_prog,
-                                           fetch_list=test_fetch_list)
-                """
-
-
-                img_data = np.random.random([1, 3, 224, 224]).astype('float32')
-                y_data = np.random.random([1, 1]).astype('int64')
-
-                t1 = time.time()
-
-                """
-                if test_batch_id == 10:
-                    profiler.start_profiler("All")
-                """
-                loss, acc1, acc5 = exe.run(prog,
-                        feed={"data": img_data, "label": y_data},
-                        fetch_list=test_fetch_list)
-                """
-                if test_batch_id == 10:
-                    profiler.stop_profiler("total", "/tmp/profile")
-                """
-                break
-
-                t2 = time.time()
-                period = t2 - t1
-                loss = np.mean(loss)
-                acc1 = np.mean(acc1)
-                acc5 = np.mean(acc5)
-                test_info[0].append(loss)
-                test_info[1].append(acc1)
-                test_info[2].append(acc5)
-                if test_batch_id % 10 == 0:
-                    print("Pass {0},testbatch {1},loss {2}, \
-                        acc1 {3},acc5 {4},time {5}"
-                          .format(pass_id, test_batch_id, loss, acc1, acc5,
-                                  "%2.2f sec" % period))
-                    sys.stdout.flush()
-                test_batch_id += 1
-        except fluid.core.EOFException:
-            exit()
-            #test_py_reader.reset()
-
-        test_loss = np.array(test_info[0]).mean()
-        test_acc1 = np.array(test_info[1]).mean()
-        test_acc5 = np.array(test_info[2]).mean()
-
-        print("End pass {0}, train_loss {1}, train_acc1 {2}, train_acc5 {3}, "
-              "test_loss {4}, test_acc1 {5}, test_acc5 {6}".format(
-                  pass_id, train_loss, train_acc1, train_acc5, test_loss,
-                  test_acc1, test_acc5))
-        sys.stdout.flush()
-
-
-        """
-        model_path = os.path.join(model_save_dir + '/' + model_name,
-                                  str(pass_id))
-        if not os.path.isdir(model_path):
-            os.makedirs(model_path)
-            print(train_cost)
-            fluid.io.save_inference_model(model_path, ["data", "label"], [train_cost, train_acc1], exe, main_program=train_prog)
-          u print("save models to %s" % (model_path))
-        """
-        exit()
-
-        #fluid.io.save_persistables(exe, model_path, main_program=train_prog)
-
-        # This is for continuous evaluation only
-        if args.enable_ce and pass_id == args.num_epochs - 1:
-            if device_num == 1:
-                # Use the mean cost/acc for training
-                print("kpis	train_cost	%s" % train_loss)
-                print("kpis	train_acc_top1	%s" % train_acc1)
-                print("kpis	train_acc_top5	%s" % train_acc5)
-                # Use the mean cost/acc for testing
-                print("kpis	test_cost	%s" % test_loss)
-                print("kpis	test_acc_top1	%s" % test_acc1)
-                print("kpis	test_acc_top5	%s" % test_acc5)
-                print("kpis	train_speed	%s" % train_speed)
-            else:
-                # Use the mean cost/acc for training
-                print("kpis	train_cost_card%s	%s" % (device_num, train_loss))
-                print("kpis	train_acc_top1_card%s	%s" %
-                      (device_num, train_acc1))
-                print("kpis	train_acc_top5_card%s	%s" %
-                      (device_num, train_acc5))
-                # Use the mean cost/acc for testing
-                print("kpis	test_cost_card%s	%s" % (device_num, test_loss))
-                print("kpis	test_acc_top1_card%s	%s" % (device_num, test_acc1))
-                print("kpis	test_acc_top5_card%s	%s" % (device_num, test_acc5))
-                print("kpis	train_speed_card%s	%s" % (device_num, train_speed))
+    if args.place == "cuda":
+        profiler.stop_profiler("total", "/tmp/profile")
 
 
 def main():
