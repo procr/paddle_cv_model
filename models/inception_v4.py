@@ -41,7 +41,8 @@ class InceptionV4():
         pool = fluid.layers.pool2d(
             input=x, pool_size=8, pool_type='avg', global_pooling=True)
 
-        drop = fluid.layers.dropout(x=pool, dropout_prob=0.2)
+        #drop = fluid.layers.dropout(x=pool, dropout_prob=0.2)
+        drop = pool
 
         stdv = 1.0 / math.sqrt(drop.shape[1] * 1.0)
         out = fluid.layers.fc(

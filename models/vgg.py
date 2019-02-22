@@ -51,7 +51,7 @@ class VGGNet():
                 initializer=fluid.initializer.Normal(scale=0.005)),
             bias_attr=fluid.param_attr.ParamAttr(
                 initializer=fluid.initializer.Constant(value=0.1)))
-        fc1 = fluid.layers.dropout(x=fc1, dropout_prob=0.5)
+        #fc1 = fluid.layers.dropout(x=fc1, dropout_prob=0.5)
         fc2 = fluid.layers.fc(
             input=fc1,
             size=fc_dim,
@@ -60,7 +60,7 @@ class VGGNet():
                 initializer=fluid.initializer.Normal(scale=0.005)),
             bias_attr=fluid.param_attr.ParamAttr(
                 initializer=fluid.initializer.Constant(value=0.1)))
-        fc2 = fluid.layers.dropout(x=fc2, dropout_prob=0.5)
+        #fc2 = fluid.layers.dropout(x=fc2, dropout_prob=0.5)
         out = fluid.layers.fc(
             input=fc2,
             size=class_dim,
