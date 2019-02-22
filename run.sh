@@ -1,6 +1,7 @@
 #!/bin/bash
 
-python train.py --model=ResNet50 --run_mode=infer --batch_size=32 --place="cuda"
+#python train.py --model=ResNet50 --run_mode=infer --batch_size=32 --place="cuda"
+python train_real_data.py --model=ResNet50 --run_mode=train --batch_size=64 --place="cuda"
 
 #Hyperparameters config
 #python train.py \

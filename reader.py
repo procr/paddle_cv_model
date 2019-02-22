@@ -14,7 +14,7 @@ DATA_DIM = 224
 THREAD = 8
 BUF_SIZE = 102400
 
-DATA_DIR = 'data/ILSVRC2012'
+DATA_DIR = '/chenrong06/ILSVRC2012'
 
 img_mean = np.array([0.485, 0.456, 0.406]).reshape((3, 1, 1))
 img_std = np.array([0.229, 0.224, 0.225]).reshape((3, 1, 1))
@@ -153,7 +153,7 @@ def _reader_creator(file_list,
             for line in lines:
                 if mode == 'train' or mode == 'val':
                     img_path, label = line.split()
-                    img_path = img_path.replace("JPEG", "jpeg")
+                    #img_path = img_path.replace("JPEG", "jpeg")
                     img_path = os.path.join(data_dir, img_path)
                     yield img_path, int(label)
                 elif mode == 'test':
