@@ -27,7 +27,7 @@ add_arg = functools.partial(add_arguments, argparser=parser)
 add_arg('batch_size',       int,   256,                  "Minibatch size.")
 add_arg('use_gpu',          bool,  True,                 "Whether to use GPU or not.")
 add_arg('total_images',     int,   1281167,              "Training image number.")
-add_arg('num_epochs',       int,   1,                    "number of epochs.")
+add_arg('num_epochs',       int,   120,                    "number of epochs.")
 add_arg('class_dim',        int,   1000,                  "Class number.")
 add_arg('image_shape',      str,   "3,224,224",          "input image size")
 add_arg('model_save_dir',   str,   "output",             "model save directory")
@@ -156,16 +156,12 @@ def net_config(image, label, model, args):
         acc_top1 = fluid.layers.accuracy(input=out0, label=label, k=1)
         acc_top5 = fluid.layers.accuracy(input=out0, label=label, k=5)
     else:
-        out = model.net(input=image, class_dim=class_dim)
-        cost, pred = fluid.layers.softmax_with_cross_entropy(
-            out, label, return_softmax=True)
-        if args.scale_loss > 1:
-            avg_cost = fluid.layers.mean(x=cost) * float(args.scale_loss)
-        else:
-            avg_cost = fluid.layers.mean(x=cost)
 
-        acc_top1 = fluid.layers.accuracy(input=pred, label=label, k=1)
-        acc_top5 = fluid.layers.accuracy(input=pred, label=label, k=5)
+        out = model.net(input=image, class_dim=class_dim)
+        cost = fluid.layers.cross_entropy(input=out, label=label)
+        avg_cost = fluid.layers.mean(x=cost)
+        acc_top1 = fluid.layers.accuracy(input=out, label=label, k=1)
+        acc_top5 = fluid.layers.accuracy(input=out, label=label, k=5) 
 
     return avg_cost, acc_top1, acc_top5
 
