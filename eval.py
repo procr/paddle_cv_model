@@ -7,25 +7,26 @@ import time
 import sys
 import paddle
 import paddle.fluid as fluid
-import models
+#import models
+import models_name as models
 #import reader_cv2 as reader
 import reader as reader
 import argparse
 import functools
-from models.learning_rate import cosine_decay
+from utils.learning_rate import cosine_decay
 from utility import add_arguments, print_arguments
 import math
 
 parser = argparse.ArgumentParser(description=__doc__)
 add_arg = functools.partial(add_arguments, argparser=parser)
 # yapf: disable
-add_arg('batch_size',       int,  256,                 "Minibatch size.")
+add_arg('batch_size',       int,  1,                 "Minibatch size.")
 add_arg('use_gpu',          bool, True,                "Whether to use GPU or not.")
 add_arg('class_dim',        int,  1000,                "Class number.")
 add_arg('image_shape',      str,  "3,224,224",         "Input image size")
 add_arg('with_mem_opt',     bool, True,                "Whether to use memory optimization or not.")
 add_arg('pretrained_model', str,  None,                "Whether to use pretrained model.")
-add_arg('model',            str, "SE_ResNeXt50_32x4d", "Set the network to use.")
+add_arg('model',            str, "ResNet50", "Set the network to use.")
 # yapf: enable
 
 model_list = [m for m in dir(models) if "__" not in m]
@@ -48,7 +49,7 @@ def eval(args):
     # model definition
     model = models.__dict__[model_name]()
 
-    if model_name is "GoogleNet":
+    if model_name == "GoogleNet":
         out0, out1, out2 = model.net(input=image, class_dim=class_dim)
         cost0 = fluid.layers.cross_entropy(input=out0, label=label)
         cost1 = fluid.layers.cross_entropy(input=out1, label=label)
@@ -70,11 +71,16 @@ def eval(args):
 
     test_program = fluid.default_main_program().clone(for_test=True)
 
+    fetch_list = [avg_cost.name, acc_top1.name, acc_top5.name]
     if with_memory_optimization:
-        fluid.memory_optimize(fluid.default_main_program())
+        fluid.memory_optimize(
+            fluid.default_main_program(), skip_opt_set=set(fetch_list))
 
-    place = fluid.CUDAPlace(0) if args.use_gpu else fluid.CPUPlace()
+    #place = fluid.CUDAPlace(0) if args.use_gpu else fluid.CPUPlace()
+    place = fluid.XSIMPlace()
+    #place = fluid.CPUPlace()
     exe = fluid.Executor(place)
+    print("Startup prog...")
     exe.run(fluid.default_startup_program())
 
     if pretrained_model:
@@ -84,10 +90,22 @@ def eval(args):
 
         fluid.io.load_vars(exe, pretrained_model, predicate=if_exist)
 
-    val_reader = paddle.batch(reader.val(""), batch_size=args.batch_size)
-    feeder = fluid.DataFeeder(place=place, feed_list=[image, label])
 
-    fetch_list = [avg_cost.name, acc_top1.name, acc_top5.name]
+    print("Loading model...")
+    fluid.io.load_inference_model("/chenrong06/trained_models/ResNet50",
+            exe, model_filename="__model__", params_filename="__params__")
+
+    print("Transpiling...")
+    inference_transpiler_program = test_program.clone()
+    t = fluid.transpiler.InferenceTranspiler()
+    t.transpile_xpu(inference_transpiler_program, place, filter_int8=True)
+    #t.transpile_xpu(inference_transpiler_program, place)
+    test_program = inference_transpiler_program
+
+    print("Inferencing...")
+
+    val_reader = paddle.batch(reader.val(), batch_size=args.batch_size)
+    feeder = fluid.DataFeeder(place=place, feed_list=[image, label])
 
     test_info = [[], [], []]
     cnt = 0
@@ -105,20 +123,20 @@ def eval(args):
         test_info[1].append(acc1 * len(data))
         test_info[2].append(acc5 * len(data))
         cnt += len(data)
-        if batch_id % 10 == 0:
-            print("Testbatch {0},loss {1}, "
-                  "acc1 {2},acc5 {3},time {4}".format(batch_id, \
-                  loss, acc1, acc5, \
-                  "%2.2f sec" % period))
-            sys.stdout.flush()
+        #if batch_id % 10 == 0:
+        print("Testbatch {0},loss {1}, "
+              "acc1 {2},acc5 {3},time {4}".format(batch_id, \
+              loss, acc1, acc5, \
+              "%2.2f sec" % period))
+        #sys.stdout.flush()
+        test_loss = np.sum(test_info[0]) / cnt
+        test_acc1 = np.sum(test_info[1]) / cnt
+        test_acc5 = np.sum(test_info[2]) / cnt
 
-    test_loss = np.sum(test_info[0]) / cnt
-    test_acc1 = np.sum(test_info[1]) / cnt
-    test_acc5 = np.sum(test_info[2]) / cnt
-
-    print("Test_loss {0}, test_acc1 {1}, test_acc5 {2}".format(
-        test_loss, test_acc1, test_acc5))
-    sys.stdout.flush()
+        print("Test_loss {0}, test_acc1 {1}, test_acc5 {2}".format(
+            test_loss, test_acc1, test_acc5))
+        sys.stdout.flush()
+        os.system('free -h')
 
 
 def main():
