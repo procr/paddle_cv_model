@@ -272,8 +272,9 @@ def train(args):
         print("Unsurpported place!")
         exit()
 
-
     exe = fluid.Executor(place)
+
+    print("Run startup...")
     exe.run(startup_prog)
 
     train_fetch_list = [train_cost.name, train_acc1.name, train_acc5.name]
@@ -283,15 +284,17 @@ def train(args):
     elif (args.run_mode == "infer"):
         prog = test_prog
     elif (args.run_mode == "fused_infer"):
+        print("Transpiling...")
         inference_transpiler_program = test_prog.clone()
         t = fluid.transpiler.InferenceTranspiler()
-        t.transpile_xpu(inference_transpiler_program, place)
+        t.transpile_xpu(inference_transpiler_program, place, filter_int8=True, use_fake_max=True)
         prog = inference_transpiler_program
     else:
         print("bad run_mode: ", args.run_mode)
         exit()
 
 
+    print("Running...")
     img_data = np.random.random([args.batch_size, 3, 224, 224]).astype('float32')
     y_data = np.random.random([args.batch_size, 1]).astype('int64')
 
@@ -300,7 +303,7 @@ def train(args):
         loss, acc1, acc5 = exe.run(prog,
                 feed={"data": img_data, "label": y_data},
                 fetch_list=train_fetch_list)
-        
+
         profiler.start_profiler("All")
 
     loss, acc1, acc5 = exe.run(prog,
