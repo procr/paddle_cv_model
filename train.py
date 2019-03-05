@@ -287,7 +287,8 @@ def train(args):
         print("Transpiling...")
         inference_transpiler_program = test_prog.clone()
         t = fluid.transpiler.InferenceTranspiler()
-        t.transpile_xpu(inference_transpiler_program, place, filter_int8=True, use_fake_max=True)
+        #t.transpile_xpu(inference_transpiler_program, place, filter_int8=True, use_fake_max=True)
+        t.transpile_xpu(inference_transpiler_program, place, filter_int16=True, use_fake_max=True)
         prog = inference_transpiler_program
     else:
         print("bad run_mode: ", args.run_mode)

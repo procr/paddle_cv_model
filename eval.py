@@ -98,7 +98,8 @@ def eval(args):
     print("Transpiling...")
     inference_transpiler_program = test_program.clone()
     t = fluid.transpiler.InferenceTranspiler()
-    t.transpile_xpu(inference_transpiler_program, place, filter_int8=True)
+    #t.transpile_xpu(inference_transpiler_program, place, filter_int8=True)
+    t.transpile_xpu(inference_transpiler_program, place, filter_int16=True)
     #t.transpile_xpu(inference_transpiler_program, place)
     test_program = inference_transpiler_program
 
