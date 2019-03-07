@@ -1,4 +1,5 @@
 #!/bin/bash
+unset GREP_OPTIONS
 file=$1
 tmp_file=analyze_tmp
 result_file=analyze_result_tmp
@@ -21,7 +22,12 @@ do
     if [ ! -f "$kernel"_tmp_file"" ]; then
         echo > "$kernel"_tmp_file""
     fi
-    cat $tmp_file | awk "/$p1$/"'{flag=1}'"/$p2$/"'{flag=0}flag' >> "$kernel"_tmp_file""
+    #cat $tmp_file | awk "/$p1$/"'{flag=1}'"/$p2$/"'{flag=0}flag' >> "$kernel"_tmp_file""
+    cat $tmp_file | awk "/$p1$/"'{flag=1}'"/$p2$/"'{flag=0}flag' |
+        grep "DURATION" |
+        awk 'BEGIN {max=0;};
+            { if ($5> max) max=$5; };
+            END {printf("DURATION: %f\n", max);}' >> "$kernel"_tmp_file""
 done
 
 echo > $result_file
@@ -31,9 +37,9 @@ do
     cat $kernel"_tmp_file" |
         grep "DURATION" |
         awk 'BEGIN {sum = 0; min = 65536; max=0; cnt=0};
-            { sum += $5; cnt++;
-              if ($5 + 0 < min + 0) min=$5;
-              if ($5 + 0 > max + 0) max=$5; };
+            { sum += $2; cnt++;
+              if ($2 + 0 < min + 0) min=$2;
+              if ($2 + 0 > max + 0) max=$2; };
             END {printf("%f %f %f %d:", sum / 1000.0, min / 1000.0, max / 1000.0, cnt);}' >> $result_file
     echo $kernel >> $result_file
     rm $kernel"_tmp_file"
