@@ -130,8 +130,7 @@ class GoogleNet():
         pool5 = fluid.layers.pool2d(
             input=ince5b, pool_size=7, pool_type='avg', pool_stride=7)
 
-        #dropout = fluid.layers.dropout(x=pool5, dropout_prob=0.4)
-        dropout = pool5
+        dropout = fluid.layers.dropout(x=pool5, dropout_prob=0.4)
 
         out = fluid.layers.fc(input=dropout,
                               size=class_dim,
@@ -147,8 +146,7 @@ class GoogleNet():
                                 act='relu',
                                 param_attr=self.xavier(2048, 1))
 
-        #dropout_o1 = fluid.layers.dropout(x=fc_o1, dropout_prob=0.7)
-        dropout_o1 = fc_o1
+        dropout_o1 = fluid.layers.dropout(x=fc_o1, dropout_prob=0.7)
 
         out1 = fluid.layers.fc(input=dropout_o1,
                                size=class_dim,
@@ -164,8 +162,7 @@ class GoogleNet():
                                 act='relu',
                                 param_attr=self.xavier(2048, 1))
 
-        #dropout_o2 = fluid.layers.dropout(x=fc_o2, dropout_prob=0.7)
-        dropout_o2 = fc_o2
+        dropout_o2 = fluid.layers.dropout(x=fc_o2, dropout_prob=0.7)
 
         out2 = fluid.layers.fc(input=dropout_o2,
                                size=class_dim,

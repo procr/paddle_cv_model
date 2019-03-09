@@ -288,8 +288,9 @@ def train(args):
         inference_transpiler_program = test_prog.clone()
         t = fluid.transpiler.InferenceTranspiler()
         config = {
-                "filter_type": "int16",
                 "use_fake_max": True,
+                "conv_weight_type": "int16",
+                "fc_weight_type": "int16",
                 "fc_pretrans_a": False,
                 "fc_pretrans_b": True
                 }

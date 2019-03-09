@@ -113,8 +113,7 @@ class AlexNet():
             pool_padding=0,
             pool_type='max')
 
-        #drop6 = fluid.layers.dropout(x=pool5, dropout_prob=0.5)
-        drop6 = pool5
+        drop6 = fluid.layers.dropout(x=pool5, dropout_prob=0.5)
 
         stdv = 1.0 / math.sqrt(drop6.shape[1] * drop6.shape[2] *
                                drop6.shape[3] * 1.0)
@@ -127,8 +126,7 @@ class AlexNet():
             param_attr=fluid.param_attr.ParamAttr(
                 initializer=fluid.initializer.Uniform(-stdv, stdv)))
 
-        #drop7 = fluid.layers.dropout(x=fc6, dropout_prob=0.5)
-        drop7 = fc6
+        drop7 = fluid.layers.dropout(x=fc6, dropout_prob=0.5)
 
         stdv = 1.0 / math.sqrt(drop7.shape[1] * 1.0)
         fc7 = fluid.layers.fc(

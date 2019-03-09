@@ -99,8 +99,9 @@ def eval(args):
     inference_transpiler_program = test_program.clone()
     t = fluid.transpiler.InferenceTranspiler()
     config = {
-            "filter_type": "int16",
             "use_fake_max": False,
+            "conv_weight_type": "int16",
+            "fc_weight_type": "int16",
             "fc_pretrans_a": False,
             "fc_pretrans_b": True
             }
