@@ -52,7 +52,7 @@ echo
 cat $result_file | sort -nr -k 1 -t " " |
     awk 'BEGIN{sumall = 0; printf("%s %s %s cnt\n", "sum", "min", "max")}
          {print $0; sumall += $1;}
-         END{printf("Total: %fms\n", sumall)}'
+         END{printf("Total: %f ms\n", sumall)}'
 
 rm $tmp_file
 rm $result_file
