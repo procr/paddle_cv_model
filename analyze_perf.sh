@@ -22,12 +22,13 @@ do
     if [ ! -f "$kernel"_tmp_file"" ]; then
         echo > "$kernel"_tmp_file""
     fi
-    #cat $tmp_file | awk "/$p1$/"'{flag=1}'"/$p2$/"'{flag=0}flag' >> "$kernel"_tmp_file""
     cat $tmp_file | awk "/$p1$/"'{flag=1}'"/$p2$/"'{flag=0}flag' |
-        grep "DURATION" |
-        awk 'BEGIN {max=0;};
-            { if ($5> max) max=$5; };
-            END {printf("DURATION: %f\n", max);}' >> "$kernel"_tmp_file""
+        awk 'BEGIN {sum=0; max=0; count=0;};
+            {
+             if ($4 == "ONDEVICE]:") {max=0; count++;}
+             if ($4 == "DURATION]:") {if ($5>max) {max=$5;} count--; if (count == 0) {sum += max; max=0;}} 
+            }
+            END {printf("DURATION: %f\n", sum);}' >> "$kernel"_tmp_file
 done
 
 echo > $result_file
