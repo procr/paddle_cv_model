@@ -43,6 +43,7 @@ add_arg('enable_ce',        bool,  False,                "If set True, enable co
 add_arg('data_dir',         str,   "./data/ILSVRC2012",  "The ImageNet dataset root dir.")
 add_arg('model_category',   str,   "models",             "Whether to use models_name or not, valid value:'models','models_name'" )
 add_arg('run_mode',         str,   "train",              "train, infer, fused_infer.")
+add_arg('precision',        str,   "int16",              "int16, int8")
 add_arg('place',            str,   "cuda",               "cuda, xsim.")
 # yapf: enabl
 
@@ -289,8 +290,8 @@ def train(args):
         t = fluid.transpiler.InferenceTranspiler()
         config = {
                 "use_fake_max": True,
-                "conv_weight_type": "int16",
-                "fc_weight_type": "int16",
+                "conv_weight_type": args.precision,
+                "fc_weight_type": args.precision,
                 "fc_pretrans_a": False,
                 "fc_pretrans_b": True
                 }
