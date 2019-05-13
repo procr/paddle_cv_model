@@ -102,6 +102,8 @@ def eval(args):
             "use_fake_max": False,
             "conv_weight_type": "int16",
             "fc_weight_type": "int16",
+            #"conv_weight_type": "float",
+            #"fc_weight_type": "float",
             "fc_pretrans_a": False,
             "fc_pretrans_b": True
             }

@@ -25,7 +25,7 @@ do
     cat $tmp_file | awk "/$p1$/"'{flag=1}'"/$p2$/"'{flag=0}flag' |
         awk 'BEGIN {sum=0; max=0; count=0;};
             {
-             if ($4 == "ONDEVICE]:") {max=0; count++;}
+             if ($5 == "Compute") {max=0; count++;}
              if ($4 == "DURATION]:") {if ($5>max) {max=$5;} count--; if (count == 0) {sum += max; max=0;}} 
             }
             END {printf("DURATION: %f\n", sum);}' >> "$kernel"_tmp_file

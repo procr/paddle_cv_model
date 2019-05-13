@@ -5,8 +5,8 @@ export XPUSIM_SIMULATOR_MODE=SYSTEMC
 export XPUSIM_SSE_LOG_LEVEL=INFO
 
 #models=("ResNet50" "VGG19" "AlexNet" "GoogleNet" "InceptionV4" "MobileNet" "MobileNetV2" "DistResNet" "SE_ResNeXt50_32x4d")
-#models=("ResNet50")
-models=("ResNet50" "VGG19" "AlexNet" "GoogleNet" "InceptionV4" "MobileNet" "MobileNetV2" "DistResNet" "SE_ResNeXt50_32x4d")
+models=("ResNet50")
+#models=("ResNet50" "VGG19" "AlexNet" "GoogleNet" "InceptionV4" "MobileNet" "MobileNetV2" "DistResNet" "SE_ResNeXt50_32x4d")
 
 #batch_size=(1 2 4 8 16)
 batch_size=(1)
@@ -18,7 +18,7 @@ place="xsim"
 #run_mode=("train" "infer" "fused_infer")
 run_mode=("fused_infer")
 #precision=("int8" "int16")
-precision=("int8")
+precision=("int16")
 
 for model in  ${models[@]}
 do
