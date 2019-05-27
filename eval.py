@@ -25,8 +25,14 @@ add_arg('use_gpu',          bool, True,                "Whether to use GPU or no
 add_arg('class_dim',        int,  1000,                "Class number.")
 add_arg('image_shape',      str,  "3,224,224",         "Input image size")
 add_arg('with_mem_opt',     bool, True,                "Whether to use memory optimization or not.")
-add_arg('pretrained_model', str,  None,                "Whether to use pretrained model.")
-add_arg('model',            str, "ResNet50", "Set the network to use.")
+#add_arg('pretrained_model', str,  "/chenrong06/trained_models/VGG19_pretrained", "Whether to use pretrained model.")
+#add_arg('pretrained_model', str,  "/chenrong06/trained_models/AlexNet_pretrained", "Whether to use pretrained model.")
+#add_arg('pretrained_model', str,  "/chenrong06/trained_models/GoogleNet_pretrained", "Whether to use pretrained model.")
+add_arg('pretrained_model', str,  "", "Whether to use pretrained model.")
+#add_arg('model',            str, "ResNet50", "Set the network to use.")
+#add_arg('model',            str, "VGG19", "Set the network to use.")
+#add_arg('model',            str, "AlexNet", "Set the network to use.")
+add_arg('model',            str, "GoogleNet", "Set the network to use.")
 # yapf: enable
 
 model_list = [m for m in dir(models) if "__" not in m]
@@ -83,6 +89,7 @@ def eval(args):
     print("Startup prog...")
     exe.run(fluid.default_startup_program())
 
+    print("Loading " + args.model)
     if pretrained_model:
 
         def if_exist(var):
@@ -90,22 +97,35 @@ def eval(args):
 
         fluid.io.load_vars(exe, pretrained_model, predicate=if_exist)
 
+        print("Saving " + args.model)
+        fluid.io.save_inference_model("/chenrong06/trained_models/" + args.model, 
+                [image.name, label.name],
+                [avg_cost, acc_top1, acc_top5],
+                exe,
+                main_program=test_program,
+                model_filename="__model__",
+                params_filename="__params__")
+        exit()
 
-    print("Loading model...")
-    fluid.io.load_inference_model("/chenrong06/trained_models/ResNet50",
-            exe, model_filename="__model__", params_filename="__params__")
+
+    else:
+        fluid.io.load_inference_model("/chenrong06/trained_models/" + args.model,
+                exe, model_filename="__model__", params_filename="__params__")
 
     print("Transpiling...")
     inference_transpiler_program = test_program.clone()
-    t = fluid.transpiler.InferenceTranspiler()
+    t = fluid.transpiler.InferenceXPUTranspiler()
     config = {
             "use_fake_max": False,
             "conv_weight_type": "int16",
             "fc_weight_type": "int16",
+            #"conv_weight_type": "int8",
+            #"fc_weight_type": "int8",
             #"conv_weight_type": "float",
             #"fc_weight_type": "float",
             "fc_pretrans_a": False,
-            "fc_pretrans_b": True
+            "fc_pretrans_b": True,
+            "batch_size": args.batch_size
             }
     t.transpile_xpu(inference_transpiler_program, place, config)
     test_program = inference_transpiler_program

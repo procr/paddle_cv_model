@@ -142,7 +142,7 @@ def net_config(main_prog, image, label, model, args):
         model.params["dropout_seed"] = 100
         class_dim = 102
 
-    if model_name == "GoogleNet":
+    if 0 and model_name == "GoogleNet":
         out0, out1, out2 = model.net(input=image, class_dim=class_dim)
 
         infer_prog = main_prog.clone(for_test=True)
@@ -269,6 +269,8 @@ def train(args):
         place = fluid.CUDAPlace(0)
     elif args.place == "xsim":
         place = fluid.XSIMPlace()
+    elif args.place == "xpu":
+        place = fluid.XPUPlace()
     else:
         print("Unsurpported place!")
         exit()
@@ -287,13 +289,14 @@ def train(args):
     elif (args.run_mode == "fused_infer"):
         print("Transpiling...")
         inference_transpiler_program = test_prog.clone()
-        t = fluid.transpiler.InferenceTranspiler()
+        t = fluid.transpiler.InferenceXPUTranspiler()
         config = {
                 "use_fake_max": True,
                 "conv_weight_type": args.precision,
                 "fc_weight_type": args.precision,
                 "fc_pretrans_a": False,
-                "fc_pretrans_b": True
+                "fc_pretrans_b": True,
+                "batch_size": args.batch_size
                 }
         t.transpile_xpu(inference_transpiler_program, place, config)
         prog = inference_transpiler_program

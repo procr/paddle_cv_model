@@ -137,37 +137,39 @@ class GoogleNet():
                               act='softmax',
                               param_attr=self.xavier(1024, 1))
 
-        pool_o1 = fluid.layers.pool2d(
-            input=ince4a, pool_size=5, pool_type='avg', pool_stride=3)
-        conv_o1 = self.conv_layer(
-            input=pool_o1, num_filters=128, filter_size=1, stride=1, act=None)
-        fc_o1 = fluid.layers.fc(input=conv_o1,
-                                size=1024,
-                                act='relu',
-                                param_attr=self.xavier(2048, 1))
+        return out
 
-        dropout_o1 = fluid.layers.dropout(x=fc_o1, dropout_prob=0.7)
+        #pool_o1 = fluid.layers.pool2d(
+        #    input=ince4a, pool_size=5, pool_type='avg', pool_stride=3)
+        #conv_o1 = self.conv_layer(
+        #    input=pool_o1, num_filters=128, filter_size=1, stride=1, act=None)
+        #fc_o1 = fluid.layers.fc(input=conv_o1,
+        #                        size=1024,
+        #                        act='relu',
+        #                        param_attr=self.xavier(2048, 1))
 
-        out1 = fluid.layers.fc(input=dropout_o1,
-                               size=class_dim,
-                               act='softmax',
-                               param_attr=self.xavier(1024, 1))
+        #dropout_o1 = fluid.layers.dropout(x=fc_o1, dropout_prob=0.7)
 
-        pool_o2 = fluid.layers.pool2d(
-            input=ince4d, pool_size=5, pool_type='avg', pool_stride=3)
-        conv_o2 = self.conv_layer(
-            input=pool_o2, num_filters=128, filter_size=1, stride=1, act=None)
-        fc_o2 = fluid.layers.fc(input=conv_o2,
-                                size=1024,
-                                act='relu',
-                                param_attr=self.xavier(2048, 1))
+        #out1 = fluid.layers.fc(input=dropout_o1,
+        #                       size=class_dim,
+        #                       act='softmax',
+        #                       param_attr=self.xavier(1024, 1))
 
-        dropout_o2 = fluid.layers.dropout(x=fc_o2, dropout_prob=0.7)
+        #pool_o2 = fluid.layers.pool2d(
+        #    input=ince4d, pool_size=5, pool_type='avg', pool_stride=3)
+        #conv_o2 = self.conv_layer(
+        #    input=pool_o2, num_filters=128, filter_size=1, stride=1, act=None)
+        #fc_o2 = fluid.layers.fc(input=conv_o2,
+        #                        size=1024,
+        #                        act='relu',
+        #                        param_attr=self.xavier(2048, 1))
 
-        out2 = fluid.layers.fc(input=dropout_o2,
-                               size=class_dim,
-                               act='softmax',
-                               param_attr=self.xavier(1024, 1))
+        #dropout_o2 = fluid.layers.dropout(x=fc_o2, dropout_prob=0.7)
 
-        # last fc layer is "out"
-        return out, out1, out2
+        #out2 = fluid.layers.fc(input=dropout_o2,
+        #                       size=class_dim,
+        #                       act='softmax',
+        #                       param_attr=self.xavier(1024, 1))
+
+        ## last fc layer is "out"
+        #return out, out1, out2

@@ -5,9 +5,9 @@ unset GREP_OPTIONS
 export XPUSIM_SIMULATOR_MODE=FUNCTION
 export XPUSIM_SSE_LOG_LEVEL=INFO
 
-models=("ResNet50" "VGG19" "AlexNet" "GoogleNet" "InceptionV4" "MobileNet" "MobileNetV2" "DistResNet" "SE_ResNeXt50_32x4d")
+#models=("ResNet50" "VGG19" "AlexNet" "GoogleNet" "InceptionV4" "MobileNet" "MobileNetV2" "DistResNet" "SE_ResNeXt50_32x4d")
 #models=("ResNet50")
-#models=("VGG19")
+models=("GoogleNet")
 
 #batch_size=(1 2 4 8 16)
 batch_size=(1)
@@ -17,8 +17,8 @@ batch_size=(1)
 
 place="xsim"
 #run_mode=("train" "infer" "fused_infer")
-#run_mode=("fused_infer")
-run_mode=("infer")
+run_mode=("fused_infer")
+#run_mode=("infer")
 
 for model in  ${models[@]}
 do
