@@ -35,7 +35,7 @@ class SE_ResNeXt():
         assert layers in supported_layers, \
             "supported layers are {} but input layer is {}".format(supported_layers, layers)
         if layers == 50:
-            cardinality = 1
+            cardinality = 32
             reduction_ratio = 16
             depth = [3, 4, 6, 3]
             num_filters = [128, 256, 512, 1024]
