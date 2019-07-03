@@ -28,15 +28,19 @@ add_arg('with_mem_opt',     bool, True,                "Whether to use memory op
 #add_arg('pretrained_model', str,  "/chenrong06/trained_models/VGG19_pretrained", "Whether to use pretrained model.")
 #add_arg('pretrained_model', str,  "/chenrong06/trained_models/AlexNet_pretrained", "Whether to use pretrained model.")
 #add_arg('pretrained_model', str,  "/chenrong06/trained_models/GoogleNet_pretrained", "Whether to use pretrained model.")
+#add_arg('pretrained_model', str,  "/chenrong06/pretraind_models/SE_ResNeXt50_32x4d_pretrained", "Whether to use pretrained model.")
 add_arg('pretrained_model', str,  "", "Whether to use pretrained model.")
+#add_arg('model',            str, "ResNeXt50", "Set the network to use.")
 #add_arg('model',            str, "ResNet50", "Set the network to use.")
 #add_arg('model',            str, "VGG19", "Set the network to use.")
 #add_arg('model',            str, "AlexNet", "Set the network to use.")
 add_arg('model',            str, "GoogleNet", "Set the network to use.")
+#add_arg('model',            str, "MobileNet", "Set the network to use.")
+#add_arg('model',            str, "MobileNetV2", "Set the network to use.")
+#add_arg('model',            str, "SE_ResNeXt50_32x4d", "Set the network to use.")
 # yapf: enable
 
 model_list = [m for m in dir(models) if "__" not in m]
-
 
 def eval(args):
     # parameters from arguments
@@ -55,7 +59,7 @@ def eval(args):
     # model definition
     model = models.__dict__[model_name]()
 
-    if model_name == "GoogleNet":
+    if 0 and model_name == "GoogleNet":
         out0, out1, out2 = model.net(input=image, class_dim=class_dim)
         cost0 = fluid.layers.cross_entropy(input=out0, label=label)
         cost1 = fluid.layers.cross_entropy(input=out1, label=label)
@@ -111,6 +115,14 @@ def eval(args):
     else:
         fluid.io.load_inference_model("/chenrong06/trained_models/" + args.model,
                 exe, model_filename="__model__", params_filename="__params__")
+
+    #print("-------------------------------------")
+    #for block in test_program.blocks:
+    #    i = 0
+    #    for op in block.ops:
+    #        print("[{}]: {}".format(i, op.type))
+    #        i += 1
+    #exit()
 
     print("Transpiling...")
     inference_transpiler_program = test_program.clone()
